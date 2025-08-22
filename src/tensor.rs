@@ -1,4 +1,5 @@
-use std::fmt::Debug;
+use std::fmt;
+use std::fmt::{Debug, Display, Formatter};
 
 use crate::error::TensorError;
 
@@ -18,7 +19,7 @@ pub struct Tensor<T> {
     pub(crate) strides: Vec<usize>,
 }
 
-impl<T: Copy + Clone + Debug> Tensor<T> {
+impl<T: Copy + Clone> Tensor<T> {
     /// Creates a new `Tensor` from a flat data buffer and a shape.
     ///
     /// The constructor validates that the number of elements in `data` matches
@@ -56,6 +57,54 @@ impl<T: Copy + Clone + Debug> Tensor<T> {
         }
 
         strides
+    }
+}
+
+/// Helper function for pretty-printing tensors.
+fn format_recursive<T: Debug>(
+    f: &mut Formatter<'_>,
+    data: &[T],
+    shape: &[usize],
+    strides: &[usize],
+    level: usize,
+) -> fmt::Result {
+    if shape.is_empty() {
+        return write!(f, "{:?}", data[0]);
+    }
+
+    let indent = " ".repeat(level * 2);
+    writeln!(f, "[")?;
+
+    let elements_in_dim = shape[0];
+    for i in 0..elements_in_dim {
+        write!(f, "{}  ", indent)?;
+        let offset = i * strides[0];
+        if shape.len() > 1 {
+            format_recursive(f, &data[offset..], &shape[1..], &strides[1..], level + 1)?;
+        } else {
+            write!(f, "{:?}", data[offset])?;
+        }
+        if i < elements_in_dim - 1 {
+            writeln!(f, ",")?;
+        } else {
+            writeln!(f)?;
+        }
+    }
+
+    write!(f, "{}]", indent)
+}
+
+impl<T: Debug> Display for Tensor<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        if self.shape.is_empty() {
+            return writeln!(f, "[]");
+        }
+
+        if self.shape.iter().any(|&dim| dim == 0) {
+            return writeln!(f, "[]");
+        }
+
+        format_recursive(f, &self.data, &self.shape, &self.strides, 0)
     }
 }
 
